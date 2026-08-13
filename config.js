@@ -1,0 +1,20 @@
+module.exports = {
+  host: 'play.dogeland.vn',
+  port: 19132,
+  username: 'MTBOTSHARD',
+  password: '',
+  authMode: 'auto',
+  modeHotbarSlot: 0,
+  modeItemName: null,
+  modeSlot: 0,
+  afkCommand: '/afk',
+  afkRoomSlot: 0,
+  checkCommand: '/shard',
+  shardRegex: /(\d[\d,.]*)\s*shard/i,
+  recipient: 'petertukogay',
+  runDurationMinutes: 330,
+  checkIntervalMinutes: 10,
+  giftCooldownMinutes: 3,
+  retryDelayMs: 10000,
+  antiAfk: false
+};

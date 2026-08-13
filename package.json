@@ -1,0 +1,15 @@
+{
+  "name": "dogeland-bot",
+  "version": "1.0.0",
+  "description": "Bot AFK test shard cho server dogeland",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mineflayer": "^4.20.1"
+  }
+}
