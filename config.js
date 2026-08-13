@@ -1,6 +1,7 @@
 module.exports = {
   host: 'play.dogeland.vn',
-  port: 19132,
+  port: 25565,
+  version: '1.21.1',
   username: 'MTBOTSHARD',
   password: '',
   authMode: 'auto',
@@ -16,5 +17,7 @@ module.exports = {
   checkIntervalMinutes: 10,
   giftCooldownMinutes: 3,
   retryDelayMs: 10000,
+  reconnectBaseMs: 20000,
+  debugChat: true,
   antiAfk: false
 };

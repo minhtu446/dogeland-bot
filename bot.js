@@ -14,6 +14,9 @@ if (process.env.DOGELAND_RECIPIENT) config.recipient = process.env.DOGELAND_RECI
 
 let bot = null;
 let shuttingDown = false;
+let generation = 0;
+let reconnectTimer = null;
+let reconnectScheduled = false;
 let state = 'auth';
 let authCommandSent = false;
 let modeWindowHandled = false;
@@ -56,10 +59,23 @@ function extractShardAmount(text) {
   return isNaN(n) ? null : n;
 }
 
+function safeChat(message) {
+  try {
+    if (bot && bot._client && typeof bot._client.chat === 'function') {
+      bot.chat(message);
+    } else {
+      log(`WARN chat not ready, skipped: ${message}`);
+    }
+  } catch (err) {
+    log(`Chat error (${message}): ${err.message}`);
+  }
+}
+
 function logWindowSlots(window) {
+  const slots = window && window.slots ? window.slots : [];
   const lines = [];
-  for (let i = 0; i < window.slotCount; i++) {
-    const slot = window.slots[i];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
     if (slot && slot.item) {
       lines.push(`  o ${i}: ${slot.item.name} | ${slot.item.displayName || ''} (x${slot.item.count})`);
     }
@@ -71,6 +87,21 @@ function logWindowSlots(window) {
   }
 }
 
+function logInventory() {
+  if (!bot || !bot.inventory) return;
+  const lines = [];
+  for (let i = 0; i < bot.inventory.slots.length; i++) {
+    const s = bot.inventory.slots[i];
+    if (s && s.item) lines.push(`  slot ${i}: ${s.item.name} (x${s.item.count})`);
+  }
+  if (lines.length) log(`Inventory:\n${lines.join('\n')}`);
+  try {
+    const held = bot.heldItem;
+    if (held && held.item) log(`Held item: ${held.item.name}`);
+    else log('Held item: (empty)');
+  } catch (err) {}
+}
+
 function maybeGift() {
   if (!bot) return;
   if (lastShardAmount <= 0) return;
@@ -80,34 +111,35 @@ function maybeGift() {
   lastGiftedAmount = lastShardAmount;
   totalGifted += lastShardAmount;
   log(`Gifting ${lastShardAmount} shard(s) to ${config.recipient}.`);
-  bot.chat(`/shard pay ${config.recipient} ${lastShardAmount}`);
+  safeChat(`/shard pay ${config.recipient} ${lastShardAmount}`);
 }
 
-function handleMessage(raw) {
+function handleMessage(raw, gen) {
   const text = clean(raw);
+  if (config.debugChat) log(`CHAT: ${text}`);
   if (/shard/i.test(text)) {
     shardLines.push(text);
     if (shardLines.length > 60) shardLines.shift();
   }
 
-  if (state === 'auth' && !authCommandSent && config.password) {
-    if (/(\/register|please register|dang ky|register)/i.test(text)) {
+  if (gen === generation && state === 'auth' && !authCommandSent && config.password) {
+    if (/(\/register|please register|dang ky|đăng ký|register)/i.test(text)) {
       log('Register prompt detected, sending /register.');
-      bot.chat(`/register ${config.password} ${config.password}`);
       authCommandSent = true;
+      safeChat(`/register ${config.password} ${config.password}`);
       scheduleModeSelection();
       return;
     }
-    if (/(\/login|please login|dang nhap|login)/i.test(text)) {
+    if (/(\/login|please login|dang nhap|đăng nhập|login)/i.test(text)) {
       log('Login prompt detected, sending /login.');
-      bot.chat(`/login ${config.password}`);
       authCommandSent = true;
+      safeChat(`/login ${config.password}`);
       scheduleModeSelection();
       return;
     }
   }
 
-  if (state === 'afk') {
+  if (gen === generation && state === 'afk') {
     const amount = extractShardAmount(text);
     if (amount !== null && amount > 0 && lastShardAmount !== amount) {
       log(`Detected shard balance: ${amount}.`);
@@ -161,7 +193,7 @@ function tryModeSelection() {
 function tryOpenAfkRoom() {
   if (shuttingDown || state !== 'afkRoom') return;
   log(`Running ${config.afkCommand}...`);
-  bot.chat(config.afkCommand);
+  safeChat(config.afkCommand);
   setTimeout(() => {
     if (state === 'afkRoom' && !afkWindowHandled) {
       log('AFK room menu did not open, retrying.');
@@ -193,9 +225,13 @@ function clickAndClose(window, slot, label, after) {
   }, 800);
 }
 
-function windowOpenHandler(window) {
-  log(`GUI opened: "${window.title || ''}" (type=${window.containerType}, slots=${window.slotCount})`);
+function windowOpenHandler(window, gen) {
+  const title = window && window.title ? clean(String(window.title)) : '(none)';
+  const n = window && window.slots ? window.slots.length : '?';
+  log(`GUI opened: title="${title}" type=${window && window.containerType} slots=${n}`);
   logWindowSlots(window);
+
+  if (gen !== generation) return;
 
   if (state === 'mode' && !modeWindowHandled) {
     modeWindowHandled = true;
@@ -213,30 +249,38 @@ function windowOpenHandler(window) {
       state = 'afk';
       lastShardAmount = -1;
       log('Entered AFK room. Starting AFK.');
-      if (bot) bot.chat(config.checkCommand);
+      safeChat(config.checkCommand);
     }), 800);
   }
 }
 
 function scheduleReconnect() {
   if (shuttingDown) return;
-  const wait = Math.min(300000, 5000 * Math.pow(2, Math.min(reconnectAttempts, 6)));
+  if (reconnectScheduled) return;
+  reconnectScheduled = true;
+  const wait = Math.min(300000, config.reconnectBaseMs * Math.pow(2, Math.min(reconnectAttempts, 4)));
   reconnectAttempts++;
   log(`Reconnecting in ${Math.round(wait / 1000)}s (attempt ${reconnectAttempts}).`);
-  setTimeout(createBot, wait);
+  reconnectTimer = setTimeout(() => {
+    reconnectScheduled = false;
+    createBot();
+  }, wait);
 }
 
 function createBot() {
+  generation++;
+  const gen = generation;
   state = 'auth';
   authCommandSent = false;
   modeWindowHandled = false;
   afkWindowHandled = false;
   windowClickTries = 0;
 
-  log(`Connecting to ${config.host}:${config.port} as ${config.username}...`);
+  log(`Connecting to ${config.host}:${config.port} (${config.version}) as ${config.username}...`);
   bot = mineflayer.createBot({
     host: config.host,
     port: config.port,
+    version: config.version,
     username: config.username,
     auth: 'offline'
   });
@@ -249,7 +293,11 @@ function createBot() {
   bot.on('spawn', () => {
     log('Spawned in game.');
     setTimeout(() => {
-      if (state !== 'auth' || shuttingDown) return;
+      if (gen !== generation) return;
+      logInventory();
+    }, 4000);
+    setTimeout(() => {
+      if (gen !== generation || state !== 'auth' || shuttingDown) return;
       if (!config.password || config.authMode === 'none') {
         log('No auth needed, starting mode selection.');
         state = 'mode';
@@ -258,32 +306,32 @@ function createBot() {
       }
       if (config.authMode === 'login' && !authCommandSent) {
         log('Sending /login.');
-        bot.chat(`/login ${config.password}`);
         authCommandSent = true;
+        safeChat(`/login ${config.password}`);
         scheduleModeSelection();
         return;
       }
       if (config.authMode === 'register' && !authCommandSent) {
         log('Sending /register.');
-        bot.chat(`/register ${config.password} ${config.password}`);
         authCommandSent = true;
+        safeChat(`/register ${config.password} ${config.password}`);
         scheduleModeSelection();
         return;
       }
       log('Waiting for login/register prompt (25s)...');
       setTimeout(() => {
-        if (state === 'auth' && !authCommandSent) {
+        if (gen !== generation || state === 'auth' && !authCommandSent) {
           log('No auth prompt received, trying /login.');
-          bot.chat(`/login ${config.password}`);
           authCommandSent = true;
+          safeChat(`/login ${config.password}`);
           scheduleModeSelection();
         }
       }, 25000);
     }, 3000);
   });
 
-  bot.on('messagestr', handleMessage);
-  bot.on('windowOpen', windowOpenHandler);
+  bot.on('messagestr', (m) => handleMessage(m, gen));
+  bot.on('windowOpen', (w) => windowOpenHandler(w, gen));
   bot.on('kicked', (reason) => {
     log(`Kicked: ${clean(reason)}`);
     scheduleReconnect();
@@ -301,7 +349,7 @@ function createBot() {
 setInterval(() => {
   if (state === 'afk' && bot) {
     log(`AFK running (${elapsedMinutes()} min). Total gifted: ${totalGifted}. Running ${config.checkCommand}...`);
-    bot.chat(config.checkCommand);
+    safeChat(config.checkCommand);
   }
 }, checkIntervalMs);
 
