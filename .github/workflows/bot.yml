@@ -1,17 +1,35 @@
 name: Dogeland Shard Bot
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Chế độ chạy: afk (AFK dài + tự tặng), gift (tặng shard rồi thoát), check (xem số shard rồi thoát)'
+        required: false
+        default: 'afk'
+        type: choice
+        options:
+          - afk
+          - gift
+          - check
+      amount:
+        description: 'Số lượng shard muốn tặng (để trống = gửi hết số dư). Chỉ dùng khi mode=gift'
+        required: false
+        type: string
   schedule:
     - cron: '0 */6 * * *'
 concurrency:
   group: dogeland-bot
-  cancel-in-progress: false
+  cancel-in-progress: true
+permissions:
+  contents: write
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     env:
       DOGELAND_PASSWORD: ${{ secrets.DOGELAND_PASSWORD }}
+      DOGELAND_MODE: ${{ inputs.mode || 'afk' }}
+      DOGELAND_AMOUNT: ${{ inputs.amount || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,3 +37,16 @@ jobs:
           node-version: '20'
       - run: npm install
       - run: node bot.js
+      - name: Publish balance snapshot
+        shell: bash
+        run: |
+          if [ -f balance.json ] && [ -n "$(git status --porcelain balance.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add balance.json
+            git commit -m "bot: update balance snapshot [skip ci]"
+            git push
+            echo "balance.json published"
+          else
+            echo "no balance change to publish"
+          fi

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dogeland Shard Tracker</title>
+<style>
+  :root { --bg: #0b0e14; --card: #141a24; --line: #232b3a; --accent: #5eead4; --gold: #ffd166; --text: #e6edf3; --dim: #8b98a9; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #1a2334 0%, var(--bg) 60%);
+    color: var(--text); min-height: 100vh; padding: 32px 16px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .wrap { width: 100%; max-width: 760px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 22px; font-weight: 700; }
+  h1 .gem { color: var(--gold); }
+  .live { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #3fb950; box-shadow: 0 0 10px #3fb950; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+
+  .card { background: linear-gradient(180deg, var(--card), #10151d); border: 1px solid var(--line); border-radius: 16px; padding: 28px; margin-bottom: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+  .balance { text-align: center; padding: 12px 0 4px; }
+  .balance .label { font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  #shard { font-size: 96px; font-weight: 800; line-height: 1.1; color: var(--gold); text-shadow: 0 0 30px rgba(255,209,102,.35); font-variant-numeric: tabular-nums; }
+  #shard.zero { color: #4a5568; text-shadow: none; }
+  .balance .suffix { font-size: 16px; color: var(--dim); margin-top: 2px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 20px; }
+  .stat { background: #0d1119; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .stat b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: 4px; }
+  .stat span { font-size: 15px; font-weight: 600; }
+
+  .gift { background: linear-gradient(135deg, #1a2b22, #10151d); border-color: #2d4a3a; }
+  .gift h2 { font-size: 16px; margin-bottom: 10px; color: var(--accent); }
+  .steps { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 16px; }
+  .step { flex: 1; min-width: 150px; background: #0d1119; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 13px; color: var(--dim); }
+  .step strong { display: block; color: var(--text); margin-bottom: 2px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input#amount { flex: 1; min-width: 160px; background: #0d1119; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 12px 14px; font-size: 15px; }
+  button { border: none; border-radius: 10px; padding: 12px 22px; font-size: 15px; font-weight: 700; cursor: pointer; }
+  #giftBtn { background: linear-gradient(135deg, #2ea043, #1f7a33); color: #fff; box-shadow: 0 4px 18px rgba(46,160,67,.35); }
+  #giftBtn:hover { filter: brightness(1.1); }
+  #giftBtn:active { transform: translateY(1px); }
+  .hint { font-size: 12px; color: var(--dim); margin-top: 10px; }
+
+  .status-msg { text-align: center; padding: 40px 20px; color: var(--dim); font-size: 15px; }
+  footer { margin-top: 8px; font-size: 12px; color: #5b6672; text-align: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Dogeland <span class="gem">◆</span> Shard Tracker</h1>
+    <div class="live"><span class="dot"></span> auto-refresh 20s</div>
+  </header>
+
+  <div class="card">
+    <div class="balance">
+      <div class="label">Số Shard hiện có của bot</div>
+      <div id="shard">--</div>
+      <div class="suffix" id="suffix">đang tải dữ liệu...</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>Bot</b><span id="stBot">MTBOTSHARD2</span></div>
+      <div class="stat"><b>Người nhận</b><span id="stRec">petertukogay</span></div>
+      <div class="stat"><b>Lần chạy cuối</b><span id="stMode">--</span></div>
+      <div class="stat"><b>Cập nhật lúc</b><span id="stTime">--</span></div>
+    </div>
+  </div>
+
+  <div class="card gift">
+    <h2>🎁 Tặng Shard cho petertukogay</h2>
+    <p style="font-size:14px;color:var(--dim)">Bot chạy trên GitHub nên nút tặng nằm trên trang Actions của repo — bạn chỉ cần bấm 1 lần:</p>
+    <div class="steps">
+      <div class="step"><strong>1. Mở Run workflow</strong>Nút bên dưới sẽ dẫn thẳng tới trang đó</div>
+      <div class="step"><strong>2. Chọn mode = gift</strong>và nhập số lượng shard muốn tặng</div>
+      <div class="step"><strong>3. Bấm Run workflow</strong>Bot vào game, gửi `/shard pay`, log xác nhận rồi tự thoát</div>
+    </div>
+    <div class="row">
+      <input id="amount" type="number" min="1" placeholder="Số lượng muốn tặng (để trống = gửi hết)">
+      <button id="giftBtn">Tặng Shard ngay →</button>
+    </div>
+    <div class="hint">⚠️ Nhập số lượng rồi bấm nút — trang GitHub sẽ mở ra, bạn dán số đó vào ô <b>amount</b> (hoặc để trống = gửi hết). Nhớ <b>petertukogay phải đang online</b>.</div>
+  </div>
+
+  <footer>Dữ liệu = snapshot lần chạy bot gần nhất (cron 6h tự động + mỗi lần bạn bấm <b>check</b>). Muốn số mới nhất: mở Actions → Run workflow → mode=<b>check</b>.</footer>
+</div>
+
+<script>
+const REPO = 'minhtu446/dogeland-bot';
+const BRANCH = 'main';
+const BALANCE_URL = 'https://raw.githubusercontent.com/' + REPO + '/' + BRANCH + '/balance.json';
+const ACTIONS_URL = 'https://github.com/' + REPO + '/actions/workflows/bot.yml';
+const $ = (id) => document.getElementById(id);
+
+async function load() {
+  try {
+    const res = await fetch(BALANCE_URL + '?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const n = parseInt(data.shard, 10);
+    $('shard').textContent = isNaN(n) ? '?' : n.toLocaleString('vi-VN');
+    $('shard').className = (isNaN(n) || n <= 0) ? 'zero' : '';
+    $('suffix').textContent = (isNaN(n) || n <= 0) ? 'chưa có shard' : 'shard';
+    $('stMode').textContent = data.mode || '--';
+    $('stTime').textContent = data.updatedAt ? new Date(data.updatedAt).toLocaleString('vi-VN') : '--';
+  } catch (e) {
+    $('shard').textContent = '--';
+    $('shard').className = 'zero';
+    $('suffix').textContent = 'chưa có dữ liệu (bot chưa chạy lần đầu hoặc đang cập nhật)';
+  }
+}
+
+$('giftBtn').onclick = () => {
+  const amt = $('amount').value.trim();
+  const url = ACTIONS_URL + (amt ? '#gift:' + amt : '');
+  window.open(url, '_blank');
+};
+
+load();
+setInterval(load, 20000);
+</script>
+</body>
+</html>
