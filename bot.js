@@ -377,11 +377,15 @@ function windowOpenHandler(window, gen) {
 
   if (state === 'mode' && !modeWindowHandled) {
     modeWindowHandled = true;
-    setTimeout(() => clickAndClose(window, config.modeSlot, 'game mode', () => {
-      state = 'afkRoom';
-      log('Game mode selected. Opening AFK room menu...');
-      setTimeout(tryOpenAfkRoom, 1000);
-    }), 800);
+    setTimeout(() => {
+      log('Mode menu re-check after sync wait...');
+      logWindowSlots(window);
+      clickAndClose(window, config.modeSlot, 'game mode', () => {
+        state = 'afkRoom';
+        log('Game mode selected. Opening AFK room menu...');
+        setTimeout(tryOpenAfkRoom, 1000);
+      });
+    }, 3000);
     return;
   }
 
