@@ -186,6 +186,24 @@ function handleGiftMode() {
   scheduleExit('Gift sent.', 15000);
 }
 
+function decodeReason(reason) {
+  try {
+    if (typeof reason === 'string' && reason.startsWith('{')) reason = JSON.parse(reason);
+  } catch (err) {}
+  if (reason && typeof reason === 'object') {
+    const parts = [];
+    if (reason.text) parts.push(reason.text);
+    if (reason.translate) parts.push(reason.translate);
+    if (Array.isArray(reason.extra)) {
+      for (const e of reason.extra) parts.push(decodeReason(e));
+    }
+    const s = parts.join('').replace(/§[0-9a-fk-or]/gi, '').trim();
+    if (s) return s;
+    return JSON.stringify(reason);
+  }
+  return clean(reason);
+}
+
 function handleMessage(raw, gen) {
   const text = clean(raw);
   if (config.debugChat) log(`CHAT: ${text}`);
@@ -464,7 +482,7 @@ function createBot() {
   bot.on('messagestr', (m) => handleMessage(m, gen));
   bot.on('windowOpen', (w) => windowOpenHandler(w, gen));
   bot.on('kicked', (reason) => {
-    log(`Kicked: ${clean(reason)}`);
+    log(`Kicked: ${decodeReason(reason)}`);
     scheduleReconnect();
   });
   bot.on('end', () => {
